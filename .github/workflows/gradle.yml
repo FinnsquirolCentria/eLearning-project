@@ -1,81 +1,37 @@
-name: CI/CD pipeline for Java with Gradle
+name: CI/CD pipeline
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-    branches: [main]
+ push:
+  branches: [ "main" ]
+ pull_request:
+  branches: [ "main" ]
 
 permissions:
-  contents: read
-
+ contents: read
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v3
-      - name: Setup Java 11
+      - name: Set up JDK 11
         uses: actions/setup-java@v3
         with:
           java-version: '11'
           distribution: 'temurin'
-
-      - name: Cache Gradle dependencies
-        uses: actions/cache@v3
-        with:
-          path: ~/.gradle/caches/
-          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
-          restore-keys: |
-            ${{ runner.os }}-gradle-
-
-      - name: Build with Gradle
-        run: gradle build
-
-  test:
-    runs-on: ubuntu-latest
-
-    needs: build
-
-    steps:
-      - uses: actions/checkout@v3
-      - name: Setup Java 11
-        uses: actions/setup-java@v3
-        with:
-          java-version: '11'
-          distribution: 'temurin'
-
-      - name: Run tests
-        run: gradle test
-
-  deploy:
-    runs-on: ubuntu-latest
-
-    needs: test
-
-    environment:
-      name: production
-
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Build with Gradle
-        run: gradle build
-
-      - name: Build Docker image
-        run: docker build -t elearning-demo .
-
-      - name: Push Docker image to Docker Hub
+      - name: Setup Gradle Wrapper
         run: |
-          docker login ghcr.io
-          docker push ghcr.io/your-username/elearning-demo
-          docker tag ghcr.io/your-username/elearning-demo:latest
-          docker push ghcr.io/your-username/elearning-demo:latest
-
-      - name: Deploy to DigitalOcean
-        uses: actions/deploy-to-digitalocean@v1
+          chmod +x gradlew
+          ./gradlew wrapper --gradle-version 7.2
+      - name: Build with Gradle
+        uses: gradle/gradle-build-action@bd5760595778326ba7f1441bcf7e88b49de61a25 # v2.6.0
         with:
-          token: ${{ secrets.DIGITALOCEAN_TOKEN }}
-          app-name: eLearningPlatform
-          region: nyc3
-          image: ghcr.io/your-username/elearning-demo:latest
+          arguments: build
+
+      - name: Build and Push Docker Image
+        uses: mr-smithers-excellent/docker-build-push@v4
+        with:
+          image: finnsquirolcentria/elearning-demo
+          registry: docker.io
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
